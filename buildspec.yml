@@ -5,7 +5,7 @@ env:
     AWS_DEFAULT_REGION: ap-south-1
     AWS_ACCOUNT_ID: 673061215407
     IMAGE_REPO_NAME: springboot-app
-    CONTAINER_NAME: DeployToEcsFargateContainerName
+    CONTAINER_NAME: MY-SPRING-CONTAINER
 
 phases:
   install:
