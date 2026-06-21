@@ -14,12 +14,12 @@ public class OrderController {
     @GetMapping("/order")
     public String placeOrder() {
         orderService.placeOrder();
-        return "Done";
+        return "Response From Order API";
     }
 
     @GetMapping("/get-order")
     public String placeGetOrder() {
         orderService.orderList();
-        return "Done";
+        return "Response From Get Order";
     }
 }
