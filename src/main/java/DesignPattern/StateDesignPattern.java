@@ -131,17 +131,13 @@ class ATMMachine {
         this.currentState = state;
     }
 
-    public ATMState getNoCardState() {
-        return noCardState;
-    }
+    public ATMState getNoCardState() {return noCardState;}
 
     public ATMState getHasCardState() {
         return hasCardState;
     }
 
-    public ATMState getPinVerifiedState() {
-        return pinVerifiedState;
-    }
+    public ATMState getPinVerifiedState() {return pinVerifiedState;}
 
     public void insertCard() {
         currentState.insertCard();

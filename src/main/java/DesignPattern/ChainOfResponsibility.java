@@ -42,7 +42,6 @@ class Director extends Approver {
             System.out.println("Approved by Manager");
 
         } else {
-
             nextApprover.approve(request);
         }
     }
