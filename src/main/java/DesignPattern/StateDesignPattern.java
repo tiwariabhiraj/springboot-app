@@ -36,6 +36,7 @@ class NoCardState implements ATMState {
         System.out.println("No card to eject.");
     }
 }
+
 class HasCardState implements ATMState {
 
     private ATMMachine atm;
@@ -71,6 +72,7 @@ class HasCardState implements ATMState {
         atm.setState(atm.getNoCardState());
     }
 }
+
 class PinVerifiedState implements ATMState {
 
     private ATMMachine atm;
@@ -113,6 +115,8 @@ class PinVerifiedState implements ATMState {
         atm.setState(atm.getNoCardState());
     }
 }
+
+
 class ATMMachine {
     ATMState noCardState;
     ATMState hasCardState;
