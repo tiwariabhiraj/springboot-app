@@ -1,0 +1,39 @@
+name: Spring Boot Build
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build Spring Boot Application
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Build Application
+        run: |
+          chmod +x mvnw
+          ./mvnw clean package
+
+      - name: Verify JAR
+        run: |
+          ls -lh target/
+          test -f target/my-app.jar
