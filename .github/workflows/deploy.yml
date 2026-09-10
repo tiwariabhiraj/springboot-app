@@ -49,3 +49,11 @@ jobs:
       - name: Test AWS connection
         run: |
           aws sts get-caller-identity
+
+      - name: Upload JAR to S3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          aws s3 cp target/my-app.jar \
+            s3://${{ vars.S3_BUCKET }}/my-app.jar
+
+          echo "JAR uploaded successfully to S3"
