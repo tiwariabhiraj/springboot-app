@@ -52,8 +52,11 @@ jobs:
       - name: Upload JAR to S3
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
+          echo "Uploading JAR to S3..."
+
           aws s3 cp target/my-app.jar \
-            s3://${{ vars.S3_BUCKET }}/my-app.jar
+            s3://${{ vars.S3_BUCKET }}/my-app.jar \
+            --no-progress
 
           echo "JAR uploaded successfully to S3"
 
@@ -69,20 +72,29 @@ jobs:
             --parameters '{
               "commands": [
                 "set -e",
-                "echo \"Creating application directory\"",
+                "echo \"===== CREATING APPLICATION DIRECTORY =====\"",
                 "mkdir -p /opt/my-app",
-                "echo \"Downloading JAR from S3\"",
-                "aws s3 cp s3://${{ vars.S3_BUCKET }}/my-app.jar /opt/my-app/my-app.jar",
+                "echo \"===== DOWNLOADING JAR FROM S3 =====\"",
+                "aws s3 cp s3://${{ vars.S3_BUCKET }}/my-app.jar /opt/my-app/my-app.jar --no-progress",
+                "echo \"JAR downloaded successfully\"",
+                "ls -lh /opt/my-app/my-app.jar",
                 "chown ec2-user:ec2-user /opt/my-app/my-app.jar",
-                "echo \"Stopping existing Spring Boot application\"",
-                "pkill -f \"java -jar /opt/my-app/my-app.jar\" || true",
+                "echo \"===== STOPPING EXISTING APPLICATION =====\"",
+                "if [ -f /opt/my-app/app.pid ]; then kill $(cat /opt/my-app/app.pid) || true; rm -f /opt/my-app/app.pid; fi",
                 "sleep 3",
-                "echo \"Starting Spring Boot application\"",
-                "nohup java -jar /opt/my-app/my-app.jar > /opt/my-app/app.log 2>&1 &",
-                "sleep 10",
-                "echo \"Checking application process\"",
-                "pgrep -f \"java -jar /opt/my-app/my-app.jar\"",
-                "echo \"Application deployment completed successfully\""
+                "echo \"===== STARTING SPRING BOOT APPLICATION =====\"",
+                "nohup java -jar /opt/my-app/my-app.jar > /opt/my-app/app.log 2>&1 & echo $! > /opt/my-app/app.pid",
+                "echo \"Application PID: $(cat /opt/my-app/app.pid)\"",
+                "echo \"===== WAITING FOR APPLICATION STARTUP =====\"",
+                "sleep 15",
+                "PID=$(cat /opt/my-app/app.pid)",
+                "echo \"===== CHECKING APPLICATION PROCESS =====\"",
+                "if kill -0 $PID 2>/dev/null; then echo \"Application is running with PID $PID\"; else echo \"Application failed to start\"; cat /opt/my-app/app.log; exit 1; fi",
+                "echo \"===== CHECKING PORT 9001 =====\"",
+                "if ss -lnt | grep -q ':9001'; then echo \"Application is listening on port 9001\"; else echo \"Port 9001 is not listening\"; cat /opt/my-app/app.log; exit 1; fi",
+                "echo \"===== APPLICATION LOG =====\"",
+                "tail -50 /opt/my-app/app.log",
+                "echo \"===== DEPLOYMENT COMPLETE =====\""
               ]
             }' \
             --query "Command.CommandId" \
