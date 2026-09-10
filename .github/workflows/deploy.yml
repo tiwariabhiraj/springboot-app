@@ -1,4 +1,4 @@
-name: Spring Boot Build and Deploy
+name: Spring Boot Build and Deploy Application
 
 on:
   push:
@@ -72,28 +72,45 @@ jobs:
             --parameters '{
               "commands": [
                 "set -e",
+
                 "echo \"===== CREATING APPLICATION DIRECTORY =====\"",
                 "mkdir -p /opt/my-app",
+
                 "echo \"===== DOWNLOADING JAR FROM S3 =====\"",
                 "aws s3 cp s3://${{ vars.S3_BUCKET }}/my-app.jar /opt/my-app/my-app.jar --no-progress",
                 "echo \"JAR downloaded successfully\"",
                 "ls -lh /opt/my-app/my-app.jar",
                 "chown ec2-user:ec2-user /opt/my-app/my-app.jar",
+
                 "echo \"===== STOPPING EXISTING APPLICATION =====\"",
-                "if [ -f /opt/my-app/app.pid ]; then kill $(cat /opt/my-app/app.pid) || true; rm -f /opt/my-app/app.pid; fi",
+                "if [ -f /opt/my-app/app.pid ]; then kill $(cat /opt/my-app/app.pid) 2>/dev/null || true; rm -f /opt/my-app/app.pid; fi",
+
+                "echo \"===== STOPPING ANY PROCESS USING PORT 9001 =====\"",
+                "fuser -k 9001/tcp 2>/dev/null || true",
+
                 "sleep 3",
+
+                "echo \"===== VERIFYING PORT 9001 IS FREE =====\"",
+                "if ss -lnt | grep -q ':9001'; then echo \"ERROR: Port 9001 is still in use\"; ss -lntp | grep ':9001' || true; exit 1; fi",
+
                 "echo \"===== STARTING SPRING BOOT APPLICATION =====\"",
                 "nohup java -jar /opt/my-app/my-app.jar > /opt/my-app/app.log 2>&1 & echo $! > /opt/my-app/app.pid",
                 "echo \"Application PID: $(cat /opt/my-app/app.pid)\"",
+
                 "echo \"===== WAITING FOR APPLICATION STARTUP =====\"",
                 "sleep 15",
+
                 "PID=$(cat /opt/my-app/app.pid)",
+
                 "echo \"===== CHECKING APPLICATION PROCESS =====\"",
                 "if kill -0 $PID 2>/dev/null; then echo \"Application is running with PID $PID\"; else echo \"Application failed to start\"; cat /opt/my-app/app.log; exit 1; fi",
+
                 "echo \"===== CHECKING PORT 9001 =====\"",
                 "if ss -lnt | grep -q ':9001'; then echo \"Application is listening on port 9001\"; else echo \"Port 9001 is not listening\"; cat /opt/my-app/app.log; exit 1; fi",
+
                 "echo \"===== APPLICATION LOG =====\"",
                 "tail -50 /opt/my-app/app.log",
+
                 "echo \"===== DEPLOYMENT COMPLETE =====\""
               ]
             }' \
