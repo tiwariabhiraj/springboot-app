@@ -20,14 +20,11 @@ jobs:
 
     steps:
 
-      # --------------------------------
-      # 1. Checkout source code
-      # --------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
       # --------------------------------
-      # 2. Debug GitHub OIDC claims
+      # Get GitHub OIDC claims
       # --------------------------------
       - name: Debug OIDC Token
         shell: bash
@@ -46,13 +43,10 @@ jobs:
 
           echo "OIDC Token obtained successfully."
 
-          # Get JWT payload
           OIDC_PAYLOAD=$(echo "$OIDC_TOKEN" | cut -d '.' -f 2)
 
-          # Convert base64url to standard base64
           OIDC_PAYLOAD=$(echo "$OIDC_PAYLOAD" | tr '_-' '/+')
 
-          # Add base64 padding
           PADDING=$(( (4 - ${#OIDC_PAYLOAD} % 4) % 4 ))
 
           if [ "$PADDING" -gt 0 ]; then
@@ -65,9 +59,6 @@ jobs:
             | base64 -d 2>/dev/null \
             | jq '{sub: .sub, aud: .aud, repository: .repository, ref: .ref}'
 
-      # --------------------------------
-      # 3. Setup Java 17
-      # --------------------------------
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -75,17 +66,11 @@ jobs:
           java-version: '17'
           cache: maven
 
-      # --------------------------------
-      # 4. Build Spring Boot application
-      # --------------------------------
       - name: Build Application
         run: |
           chmod +x mvnw
           ./mvnw clean package
 
-      # --------------------------------
-      # 5. Verify generated JAR
-      # --------------------------------
       - name: Verify JAR
         run: |
           ls -lh target/
