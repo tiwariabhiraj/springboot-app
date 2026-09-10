@@ -23,42 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # --------------------------------
-      # Get GitHub OIDC claims
-      # --------------------------------
-      - name: Debug OIDC Token
-        shell: bash
-        run: |
-          echo "Getting OIDC Token..."
-
-          OIDC_TOKEN=$(curl -sSf \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-            | jq -r '.value')
-
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "Failed to obtain OIDC token"
-            exit 1
-          fi
-
-          echo "OIDC Token obtained successfully."
-
-          OIDC_PAYLOAD=$(echo "$OIDC_TOKEN" | cut -d '.' -f 2)
-
-          OIDC_PAYLOAD=$(echo "$OIDC_PAYLOAD" | tr '_-' '/+')
-
-          PADDING=$(( (4 - ${#OIDC_PAYLOAD} % 4) % 4 ))
-
-          if [ "$PADDING" -gt 0 ]; then
-            OIDC_PAYLOAD="${OIDC_PAYLOAD}$(printf '%*s' "$PADDING" '' | tr ' ' '=')"
-          fi
-
-          echo "=== OIDC Claims ==="
-
-          echo "$OIDC_PAYLOAD" \
-            | base64 -d 2>/dev/null \
-            | jq '{sub: .sub, aud: .aud, repository: .repository, ref: .ref}'
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -75,3 +39,13 @@ jobs:
         run: |
           ls -lh target/
           test -f target/my-app.jar
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::022499040191:role/GitHubActionsSpringBootRole
+          aws-region: ap-south-1
+
+      - name: Test AWS connection
+        run: |
+          aws sts get-caller-identity
