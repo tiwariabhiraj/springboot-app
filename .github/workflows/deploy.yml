@@ -1,4 +1,4 @@
-name: Spring Boot Build
+name: Spring Boot Build and Deploy
 
 on:
   push:
@@ -19,7 +19,6 @@ jobs:
       contents: read
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -57,3 +56,80 @@ jobs:
             s3://${{ vars.S3_BUCKET }}/my-app.jar
 
           echo "JAR uploaded successfully to S3"
+
+      - name: Deploy application to EC2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "Starting deployment to EC2..."
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy Spring Boot application" \
+            --parameters '{
+              "commands": [
+                "set -e",
+                "echo \"Creating application directory\"",
+                "mkdir -p /opt/my-app",
+                "echo \"Downloading JAR from S3\"",
+                "aws s3 cp s3://${{ vars.S3_BUCKET }}/my-app.jar /opt/my-app/my-app.jar",
+                "chown ec2-user:ec2-user /opt/my-app/my-app.jar",
+                "echo \"Stopping existing Spring Boot application\"",
+                "pkill -f \"java -jar /opt/my-app/my-app.jar\" || true",
+                "sleep 3",
+                "echo \"Starting Spring Boot application\"",
+                "nohup java -jar /opt/my-app/my-app.jar > /opt/my-app/app.log 2>&1 &",
+                "sleep 10",
+                "echo \"Checking application process\"",
+                "pgrep -f \"java -jar /opt/my-app/my-app.jar\"",
+                "echo \"Application deployment completed successfully\""
+              ]
+            }' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          for i in {1..30}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "Deployment status: $STATUS"
+
+            if [ "$STATUS" = "Success" ]; then
+              echo "======================================"
+              echo "Deployment successful!"
+              echo "======================================"
+
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+                --query "StandardOutputContent" \
+                --output text
+
+              exit 0
+            fi
+
+            if [ "$STATUS" = "Failed" ] || \
+               [ "$STATUS" = "Cancelled" ] || \
+               [ "$STATUS" = "TimedOut" ]; then
+
+              echo "======================================"
+              echo "Deployment failed!"
+              echo "======================================"
+
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ vars.EC2_INSTANCE_ID }}"
+
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          echo "Deployment timed out"
+          exit 1
